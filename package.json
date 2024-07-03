@@ -8,7 +8,7 @@
   "files": [
     "dist"
   ],
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/cli.js"
