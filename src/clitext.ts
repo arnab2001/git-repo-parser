@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { scrapeRepository } from './index';
+import { scrapeRepositoryToPlainText } from "./scraper";
 import * as fs from 'fs';
 
 async function main() {
@@ -12,12 +12,11 @@ async function main() {
     }
 
     // Scrape the repository and get the result
-    const result = await scrapeRepository(repoUrl);
-    const jsonResult = JSON.stringify(result, null, 2);
+    const result = await scrapeRepositoryToPlainText(repoUrl);
 
     // Write the JSON to a file
-    fs.writeFileSync('files.json', jsonResult);
-    console.log('File list has been saved to files.json');
+    fs.writeFileSync('files.txt', result);
+    console.log('File list has been saved to files.text');
 }
 
 main().catch(err => console.error(err));
