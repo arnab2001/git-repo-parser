@@ -1,6 +1,6 @@
 {
   "name": "git-repo-to-json",
-  "version": "2.0.0",
+  "version": "2.0.5",
   "description": "A tool to scrape all files from a GitHub repository and turn it into a JSON file",
   "bin": {
     "git-repo-to-json": "dist/cli.js"
