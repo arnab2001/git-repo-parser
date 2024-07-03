@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import simpleGit from 'simple-git';
 
-interface FileData {
+export interface FileData {
     name: string;
     path: string;
     type: 'file' | 'directory';
@@ -26,6 +26,10 @@ function scrapeDirectory(dir: string, ignorePatterns: string[] = []): FileData[]
         const stat = fs.statSync(filePath);
 
         if (stat.isDirectory()) {
+            // Ignore the .git directory
+            if (file === '.git') {
+                return null;
+            }
             return {
                 name: file,
                 path: filePath,
@@ -41,7 +45,7 @@ function scrapeDirectory(dir: string, ignorePatterns: string[] = []): FileData[]
                 content: content
             };
         }
-    });
+    }).filter(item => item !== null) as FileData[];
 }
 
 export async function scrapeRepository(repoUrl: string): Promise<FileData[]> {
