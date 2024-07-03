@@ -1,0 +1,25 @@
+{
+  "name": "git-repo-to-json",
+  "version": "1.0.0",
+  "description": "A tool to scrape all files from a GitHub repository and turn it into a JSON file",
+  "bin": {
+    "git-repo-to-json": "dist/cli.js"
+  },
+  
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js"
+  },
+
+  "keywords": ["github", "scraper", "json"],
+  "author": "arnab2001",
+  "license": "MIT",
+  "dependencies": {
+    "simple-git": "^2.41.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.9.4",
+    "@types/node": "^18.11.19"
+  }
+}
