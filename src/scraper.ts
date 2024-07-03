@@ -106,10 +106,18 @@ function scrapeDirectoryToPlainText(dir: string, ignorePatterns: string[] = [], 
             if (file === '.git') {
                 return;
             }
+            // Mark the start of a directory
+            result += `[DIR_START]${path.join(prefix, file)}\n`;
             result += scrapeDirectoryToPlainText(filePath, ignorePatterns, path.join(prefix, file));
+            // Mark the end of a directory
+            result += `[DIR_END]${path.join(prefix, file)}\n\n`;
         } else {
+            // Mark the start of a file
+            result += `[FILE_START]${path.join(prefix, file)}\n`;
             const content = fs.readFileSync(filePath, 'utf-8');
-            result += `${path.join(prefix, file)}\n${content}\n\n`;
+            result += content;
+            // Mark the end of a file
+            result += `\n[FILE_END]${path.join(prefix, file)}\n\n`;
         }
     });
 
