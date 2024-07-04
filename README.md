@@ -103,6 +103,16 @@ arnab2001
 ## Contributing
 
 Contributions, issues, and feature requests are welcome. Feel free to check [issues page] if you want to contribute.
+Open Source Community
+Conduct
+
+We are committed to fostering a welcoming and inclusive open-source community. We expect all contributors to adhere to our Code of Conduct to create a respectful and collaborative environment.
+
+Contributor License Agreement
+By contributing to git-repo-parser, you agree to the terms of our Contributor License Agreement (CLA). The CLA ensures that we can use your contributions in accordance with the project's license.
+
+Documentation
+If you have any questions or need help using or contributing to git-repo-parser, don't hesitate to ask for help on the project's GitHub page or through the project's communication channels (e.g., Discord, Slack, etc.). Additionally, our documentation provides comprehensive information about using and contributing to the project.
 
 ## Show your support
 
