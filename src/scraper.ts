@@ -1,6 +1,10 @@
-import * as fs from 'fs';
+import { promises as fs } from 'fs';
+import type { Dirent } from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import simpleGit from 'simple-git';
+import { encode, type EncodeOptions } from '@toon-format/toon';
+import { countTokens, type TokenCountOptions } from './tokenCounter';
 
 export interface FileData {
     name: string;
@@ -14,6 +18,120 @@ async function cloneRepository(repoUrl: string, clonePath: string) {
     const git = simpleGit();
     await git.clone(repoUrl, clonePath);
     console.log(`Repository cloned to ${clonePath}`);
+}
+
+const MAX_CONCURRENCY = 10;
+const IGNORED_SEGMENTS = new Set<string>(['.git']);
+
+const EXTENSION_LANG_MAP: Record<string, string> = {
+    '.ts': 'ts',
+    '.tsx': 'tsx',
+    '.js': 'js',
+    '.jsx': 'jsx',
+    '.mjs': 'js',
+    '.cjs': 'js',
+    '.json': 'json',
+    '.md': 'md',
+    '.py': 'py',
+    '.rb': 'rb',
+    '.go': 'go',
+    '.rs': 'rs',
+    '.java': 'java',
+    '.kt': 'kt',
+    '.kts': 'kt',
+    '.swift': 'swift',
+    '.c': 'c',
+    '.h': 'c',
+    '.cpp': 'cpp',
+    '.hpp': 'cpp',
+    '.cc': 'cpp',
+    '.hh': 'cpp',
+    '.cs': 'cs',
+    '.php': 'php',
+    '.sh': 'sh',
+    '.bash': 'sh',
+    '.zsh': 'sh',
+    '.yaml': 'yaml',
+    '.yml': 'yaml',
+    '.toml': 'toml',
+    '.ini': 'ini',
+    '.cfg': 'ini',
+    '.txt': 'txt',
+    '.css': 'css',
+    '.scss': 'scss',
+    '.sass': 'sass',
+    '.less': 'less',
+    '.vue': 'vue',
+    '.svelte': 'svelte'
+};
+
+export interface TranscriptFormatOptions {
+    includeMeta?: boolean;
+}
+
+function sanitiseRepoLabel(repoUrl: string): string {
+    let candidate = repoUrl.trim();
+
+    try {
+        const parsed = new URL(repoUrl);
+        candidate = parsed.pathname.split('/').pop() ?? '';
+    } catch {
+        const segments = candidate.split('/');
+        candidate = segments[segments.length - 1] ?? '';
+    }
+
+    candidate = candidate.replace(/\.git$/i, '');
+    const sanitised = candidate.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+    const truncated = sanitised.slice(0, 64);
+    return truncated || 'repository';
+}
+
+async function prepareCloneWorkspace(repoUrl: string) {
+    const repoLabel = sanitiseRepoLabel(repoUrl);
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'git-repo-parser-'));
+    const clonePath = path.join(tempRoot, repoLabel);
+
+    async function cleanup() {
+        try {
+            await fs.rm(tempRoot, { recursive: true, force: true });
+        } catch (error) {
+            console.warn(`Failed to clean temporary directory ${tempRoot}:`, error);
+        }
+    }
+
+    return { clonePath, cleanup };
+}
+
+function toPosixPath(filePath: string): string {
+    return filePath.split(path.sep).join('/');
+}
+
+function shouldIgnorePath(relativePath: string, ignoreSegments: Set<string>): boolean {
+    const segments = relativePath.split(path.sep).filter(Boolean);
+    return segments.some(segment => ignoreSegments.has(segment));
+}
+
+async function mapWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    mapper: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+    const results: R[] = new Array(items.length);
+    let nextIndex = 0;
+
+    async function worker() {
+        while (true) {
+            const currentIndex = nextIndex++;
+            if (currentIndex >= items.length) {
+                break;
+            }
+            results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+        }
+    }
+
+    const workerCount = Math.min(limit, items.length);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    return results;
 }
 
 function shouldIgnoreFile(fileName: string): boolean {
@@ -53,115 +171,243 @@ function shouldIgnoreFile(fileName: string): boolean {
     );
 }
 
-function scrapeDirectoryToJson(dir: string, ignorePatterns: string[] = []): FileData[] {
-    const files = fs.readdirSync(dir);
-    return files.filter(file => {
-        const filePath = path.join(dir, file);
-        return (
-            !ignorePatterns.some(pattern => filePath.includes(pattern)) &&
-            !shouldIgnoreFile(file)
-        );
-    }).map(file => {
-        const filePath = path.join(dir, file);
-        const stat = fs.statSync(filePath);
+async function scrapeDirectoryToJson(
+    dir: string,
+    baseDir: string,
+    ignoreSegments: Set<string>
+): Promise<FileData[]> {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
 
-        if (stat.isDirectory()) {
-            // Ignore the .git directory
-            if (file === '.git') {
-                return null;
-            }
-            return {
-                name: file,
-                path: filePath,
-                type: 'directory',
-                children: scrapeDirectoryToJson(filePath, ignorePatterns)
-            };
-        } else {
-            const content = fs.readFileSync(filePath, 'utf-8');
-            return {
-                name: file,
-                path: filePath,
-                type: 'file',
-                content: content
-            };
+    const processed = await mapWithConcurrency(entries, MAX_CONCURRENCY, async (entry) => {
+        const entryPath = path.join(dir, entry.name);
+        const relativePath = path.relative(baseDir, entryPath);
+
+        if (!relativePath) {
+            return null;
         }
-    }).filter(item => item !== null) as FileData[];
+        if (shouldIgnorePath(relativePath, ignoreSegments) || shouldIgnoreFile(entry.name)) {
+            return null;
+        }
+
+        try {
+            if (entry.isDirectory()) {
+                const children = await scrapeDirectoryToJson(entryPath, baseDir, ignoreSegments);
+                return {
+                    name: entry.name,
+                    path: toPosixPath(relativePath),
+                    type: 'directory' as const,
+                    children
+                };
+            }
+
+            if (entry.isFile()) {
+                const content = await fs.readFile(entryPath, { encoding: 'utf-8' });
+                return {
+                    name: entry.name,
+                    path: toPosixPath(relativePath),
+                    type: 'file' as const,
+                    content
+                };
+            }
+        } catch (error) {
+            console.warn(`Skipping ${entryPath} due to error:`, error);
+        }
+
+        return null;
+    });
+
+    const filtered = processed.filter((item): item is NonNullable<typeof item> => item !== null);
+    return filtered as FileData[];
 }
 
-function scrapeDirectoryToPlainText(dir: string, ignorePatterns: string[] = [], prefix: string = ''): string {
+function detectLanguage(fileName: string): string | undefined {
+    const ext = path.extname(fileName).toLowerCase();
+    return EXTENSION_LANG_MAP[ext];
+}
+
+function sortDirEntries(entries: Dirent[]): { directories: Dirent[]; files: Dirent[] } {
+    const directories = entries.filter(entry => entry.isDirectory()).sort((a, b) => a.name.localeCompare(b.name));
+    const files = entries.filter(entry => entry.isFile()).sort((a, b) => a.name.localeCompare(b.name));
+    return { directories, files };
+}
+
+function createMetadataLine(fileName: string, content: string): string {
+    const size = Buffer.byteLength(content, 'utf-8');
+    const metadata: string[] = [`size=${size}`];
+    const lang = detectLanguage(fileName);
+    if (lang) {
+        metadata.unshift(`lang=${lang}`);
+    }
+    return `meta: ${metadata.join(' ')}`;
+}
+
+async function generateTranscript(
+    dir: string,
+    baseDir: string,
+    ignoreSegments: Set<string>,
+    options: TranscriptFormatOptions,
+    prefix = ''
+): Promise<string> {
     let result = '';
 
-    const files = fs.readdirSync(dir);
-    files.forEach(file => {
-        const filePath = path.join(dir, file);
+    const entries = await fs.readdir(dir, { withFileTypes: true });
 
-        if (ignorePatterns.some(pattern => filePath.includes(pattern)) || shouldIgnoreFile(file)) {
-            return;
+    const { directories, files } = sortDirEntries(entries);
+
+    for (const entry of directories) {
+        const filePath = path.join(dir, entry.name);
+        const relativePath = path.relative(baseDir, filePath);
+
+        if (!relativePath) {
+            continue;
+        }
+        if (shouldIgnorePath(relativePath, ignoreSegments) || shouldIgnoreFile(entry.name)) {
+            continue;
         }
 
-        const stat = fs.statSync(filePath);
+        const displayPath = toPosixPath(path.join(prefix, entry.name));
 
-        if (stat.isDirectory()) {
-            // Ignore the .git directory
-            if (file === '.git') {
-                return;
+        try {
+            result += `[DIR_START] ${displayPath}\n`;
+            result += await generateTranscript(
+                filePath,
+                baseDir,
+                ignoreSegments,
+                options,
+                path.join(prefix, entry.name)
+            );
+            result += `[DIR_END] ${displayPath}\n\n`;
+        } catch (error) {
+            console.warn(`Skipping ${filePath} due to error:`, error);
+        }
+    }
+
+    for (const entry of files) {
+        const filePath = path.join(dir, entry.name);
+        const relativePath = path.relative(baseDir, filePath);
+
+        if (!relativePath) {
+            continue;
+        }
+        if (shouldIgnorePath(relativePath, ignoreSegments) || shouldIgnoreFile(entry.name)) {
+            continue;
+        }
+
+        const displayPath = toPosixPath(path.join(prefix, entry.name));
+
+        try {
+            const content = await fs.readFile(filePath, { encoding: 'utf-8' });
+            result += `[FILE_START] ${displayPath}\n`;
+
+            if (options.includeMeta) {
+                result += `${createMetadataLine(entry.name, content)}\n`;
             }
-            // Mark the start of a directory
-            result += `[DIR_START]${path.join(prefix, file)}\n`;
-            result += scrapeDirectoryToPlainText(filePath, ignorePatterns, path.join(prefix, file));
-            // Mark the end of a directory
-            result += `[DIR_END]${path.join(prefix, file)}\n\n`;
-        } else {
-            // Mark the start of a file
-            result += `[FILE_START]${path.join(prefix, file)}\n`;
-            const content = fs.readFileSync(filePath, 'utf-8');
+
             result += content;
-            // Mark the end of a file
-            result += `\n[FILE_END]${path.join(prefix, file)}\n\n`;
+            if (!content.endsWith('\n')) {
+                result += '\n';
+            }
+            result += `[FILE_END] ${displayPath}\n\n`;
+        } catch (error) {
+            console.warn(`Skipping ${filePath} due to error:`, error);
         }
-    });
+    }
 
     return result;
 }
 
 export async function scrapeRepositoryToJson(repoUrl: string): Promise<FileData[]> {
-    const repoName = repoUrl.split('/').pop()?.replace('.git', '');
-    if (!repoName) {
-        throw new Error('Invalid repository URL');
+    const { clonePath, cleanup } = await prepareCloneWorkspace(repoUrl);
+
+    try {
+        await cloneRepository(repoUrl, clonePath);
+        return await scrapeDirectoryToJson(clonePath, clonePath, IGNORED_SEGMENTS);
+    } finally {
+        await cleanup();
     }
-    const clonePath = `./${repoName}`; // Directory where the repository will be cloned
-
-    // Clone the repository
-    await cloneRepository(repoUrl, clonePath);
-
-    // Scrape the cloned repository directory
-    const ignorePatterns = ['.git'];
-    const result = scrapeDirectoryToJson(clonePath, ignorePatterns);
-
-    // Clean up the cloned repository
-    fs.rmdirSync(clonePath, { recursive: true });
-    console.log('Cloned repository directory removed');
-
-    return result;
 }
 
 export async function scrapeRepositoryToPlainText(repoUrl: string): Promise<string> {
-    const repoName = repoUrl.split('/').pop()?.replace('.git', '');
-    if (!repoName) {
-        throw new Error('Invalid repository URL');
+    return scrapeRepositoryToTranscript(repoUrl);
+}
+
+export async function scrapeRepositoryToTranscript(
+    repoUrl: string,
+    options: TranscriptFormatOptions = {}
+): Promise<string> {
+    const { clonePath, cleanup } = await prepareCloneWorkspace(repoUrl);
+
+    try {
+        await cloneRepository(repoUrl, clonePath);
+        return await generateTranscript(clonePath, clonePath, IGNORED_SEGMENTS, {
+            includeMeta: options.includeMeta ?? false
+        });
+    } finally {
+        await cleanup();
     }
-    const clonePath = `./${repoName}`; // Directory where the repository will be cloned
+}
 
-    // Clone the repository
-    await cloneRepository(repoUrl, clonePath);
+export async function scrapeRepositoryToToon(
+    repoUrl: string,
+    options?: EncodeOptions
+): Promise<string> {
+    const { toon } = await scrapeRepositoryToToonWithTokenCount(repoUrl, options);
+    return toon;
+}
 
-    // Scrape the cloned repository directory
-    const ignorePatterns = ['.git'];
-    const result = scrapeDirectoryToPlainText(clonePath, ignorePatterns);
+export interface ToonScrapeResult {
+    toon: string;
+    tokenCount: number;
+}
 
-    // Clean up the cloned repository
-    fs.rmdirSync(clonePath, { recursive: true });
-    console.log('Cloned repository directory removed');
+export async function scrapeRepositoryToToonWithTokenCount(
+    repoUrl: string,
+    encodeOptions?: EncodeOptions,
+    tokenOptions?: TokenCountOptions
+): Promise<ToonScrapeResult> {
+    const files = await scrapeRepositoryToJson(repoUrl);
+    const toon = encode({ files }, encodeOptions);
+    return {
+        toon,
+        tokenCount: countTokens(toon, tokenOptions)
+    };
+}
 
-    return result;
+export interface JsonScrapeResult {
+    files: FileData[];
+    json: string;
+    tokenCount: number;
+}
+
+export async function scrapeRepositoryToJsonWithTokenCount(
+    repoUrl: string,
+    indent = 2,
+    tokenOptions?: TokenCountOptions
+): Promise<JsonScrapeResult> {
+    const files = await scrapeRepositoryToJson(repoUrl);
+    const json = JSON.stringify(files, null, indent);
+    return {
+        files,
+        json,
+        tokenCount: countTokens(json, tokenOptions)
+    };
+}
+
+export interface TranscriptScrapeResult {
+    text: string;
+    tokenCount: number;
+}
+
+export type PlainTextScrapeResult = TranscriptScrapeResult;
+
+export async function scrapeRepositoryToPlainTextWithTokenCount(
+    repoUrl: string,
+    tokenOptions?: TokenCountOptions,
+    transcriptOptions?: TranscriptFormatOptions
+): Promise<TranscriptScrapeResult> {
+    const text = await scrapeRepositoryToTranscript(repoUrl, transcriptOptions);
+    return {
+        text,
+        tokenCount: countTokens(text, tokenOptions)
+    };
 }

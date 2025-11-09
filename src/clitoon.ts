@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { scrapeRepositoryToJsonWithTokenCount } from './scraper';
+import { scrapeRepositoryToToonWithTokenCount } from './scraper';
 import { promises as fs } from 'fs';
 
 async function main() {
@@ -30,9 +30,9 @@ async function main() {
         flags.has('--token') ||
         flags.has('-t');
 
-    const { json, tokenCount } = await scrapeRepositoryToJsonWithTokenCount(repoUrl);
-    await fs.writeFile('files.json', `${json}\n`, { encoding: 'utf-8' });
-    console.log('File list has been saved to files.json');
+    const { toon, tokenCount } = await scrapeRepositoryToToonWithTokenCount(repoUrl);
+    await fs.writeFile('files.toon', `${toon}\n`, { encoding: 'utf-8' });
+    console.log('File list has been saved to files.toon');
 
     if (showTokenCount) {
         console.log(`Token count (cl100k_base): ${tokenCount}`);
@@ -43,3 +43,4 @@ main().catch(err => {
     console.error(err);
     process.exitCode = 1;
 });
+

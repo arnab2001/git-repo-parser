@@ -1,0 +1,179 @@
+{
+  "generatedAt": "2025-11-09T21:18:49.257Z",
+  "repositories": [
+    {
+      "name": "octocat-hello-world",
+      "url": "https://github.com/octocat/Hello-World",
+      "results": [
+        {
+          "format": "json",
+          "formatLabel": "JSON",
+          "durationMs": 936.953458,
+          "tokenCount": 37,
+          "outputBytes": 107,
+          "extra": "files: 1"
+        },
+        {
+          "format": "toon",
+          "formatLabel": "TOON",
+          "durationMs": 880.8243749999999,
+          "tokenCount": 22,
+          "outputBytes": 71
+        },
+        {
+          "format": "text",
+          "formatLabel": "Plain Text",
+          "durationMs": 919.8080830000001,
+          "tokenCount": 15,
+          "outputBytes": 52
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "octocat-spoon-knife",
+      "url": "https://github.com/octocat/Spoon-Knife",
+      "results": [
+        {
+          "format": "json",
+          "formatLabel": "JSON",
+          "durationMs": 904.1952919999999,
+          "tokenCount": 523,
+          "outputBytes": 1759,
+          "extra": "files: 3"
+        },
+        {
+          "format": "toon",
+          "formatLabel": "TOON",
+          "durationMs": 906.0097909999995,
+          "tokenCount": 460,
+          "outputBytes": 1589
+        },
+        {
+          "format": "text",
+          "formatLabel": "Plain Text",
+          "durationMs": 895.6935830000002,
+          "tokenCount": 414,
+          "outputBytes": 1530
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "axios-axios",
+      "url": "https://github.com/axios/axios",
+      "results": [
+        {
+          "format": "json",
+          "formatLabel": "JSON",
+          "durationMs": 3263.6907499999998,
+          "tokenCount": 261071,
+          "outputBytes": 922326,
+          "extra": "files: 30"
+        },
+        {
+          "format": "toon",
+          "formatLabel": "TOON",
+          "durationMs": 3151.3070829999997,
+          "tokenCount": 255992,
+          "outputBytes": 898912
+        },
+        {
+          "format": "text",
+          "formatLabel": "Plain Text",
+          "durationMs": 3269.705,
+          "tokenCount": 222580,
+          "outputBytes": 864449
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "sindresorhus-slugify",
+      "url": "https://github.com/sindresorhus/slugify",
+      "results": [
+        {
+          "format": "json",
+          "formatLabel": "JSON",
+          "durationMs": 941.9017920000006,
+          "tokenCount": 10610,
+          "outputBytes": 31520,
+          "extra": "files: 12"
+        },
+        {
+          "format": "toon",
+          "formatLabel": "TOON",
+          "durationMs": 924.5914580000008,
+          "tokenCount": 10462,
+          "outputBytes": 31053
+        },
+        {
+          "format": "text",
+          "formatLabel": "Plain Text",
+          "durationMs": 936.3613750000004,
+          "tokenCount": 8599,
+          "outputBytes": 28697
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "lodash-lodash",
+      "url": "https://github.com/lodash/lodash",
+      "results": [
+        {
+          "format": "json",
+          "formatLabel": "JSON",
+          "durationMs": 7290.946833000002,
+          "tokenCount": 1367886,
+          "outputBytes": 4652891,
+          "extra": "files: 25"
+        },
+        {
+          "format": "toon",
+          "formatLabel": "TOON",
+          "durationMs": 6984.508209,
+          "tokenCount": 1365925,
+          "outputBytes": 4643896
+        },
+        {
+          "format": "text",
+          "formatLabel": "Plain Text",
+          "durationMs": 7281.696166999998,
+          "tokenCount": 1184440,
+          "outputBytes": 4469746
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "octokit-request",
+      "url": "https://github.com/octokit/request.js",
+      "results": [
+        {
+          "format": "json",
+          "formatLabel": "JSON",
+          "durationMs": 1493.2384579999998,
+          "tokenCount": 44982,
+          "outputBytes": 154107,
+          "extra": "files: 11"
+        },
+        {
+          "format": "toon",
+          "formatLabel": "TOON",
+          "durationMs": 1471.8035000000018,
+          "tokenCount": 44256,
+          "outputBytes": 151406
+        },
+        {
+          "format": "text",
+          "formatLabel": "Plain Text",
+          "durationMs": 1470.116833,
+          "tokenCount": 38016,
+          "outputBytes": 143952
+        }
+      ],
+      "error": null
+    }
+  ]
+}
